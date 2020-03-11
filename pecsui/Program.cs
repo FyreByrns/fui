@@ -29,7 +29,7 @@ namespace pecsui {
         }
 
         private void Testing_MouseClick(int x, int y, Mouse button) {
-            Console.WriteLine("Clicc");
+            Console.WriteLine($"Click at {x},{y}");
         }
 
         public override void OnUpdate(float elapsed) {
@@ -151,10 +151,24 @@ namespace pecsui {
 
         #endregion Positioning
 
+        public UIElement Parent {
+            get => _parent; set {
+                _parentOld?.Children?.Remove(this);
+                _parent = value;
+                _parent?.Children?.Add(this);
+                _parentOld = _parent;
+            }
+        }
+        public List<UIElement> Children { get; set; } = new List<UIElement>();
         #endregion Properties
+        #region Fields
+        int oldX, oldY, oldWidth, oldHeight;
+        UIElement _parent, _parentOld;
+
+        #endregion Fields
         #region Utility Functions
         public static bool PointWithin(int pX, int pY, Point rectTopLeft, Point rectBottomRight)
-            => pX > rectTopLeft.X && pX < rectBottomRight.X && pY > rectTopLeft.Y && pY < rectBottomRight.Y;
+            => pX >= rectTopLeft.X && pX <= rectBottomRight.X && pY >= rectTopLeft.Y && pY <= rectBottomRight.Y;
         public static bool PointWithin(int pX, int pY, int left, int top, int right, int bottom)
             => PointWithin(pX, pY, new Point(left, top), new Point(bottom, right));
 
@@ -164,26 +178,42 @@ namespace pecsui {
             #region Fire Mouse Events
             int mouseX = context.MouseX;
             int mouseY = context.MouseY;
+            int localX = mouseX - X;
+            int localY = mouseY - Y;
 
-            if ((mouseX != mouseLastX || mouseY != mouseLastY) && PointWithin(mouseX, mouseY, TopLeft, BottomRight)) {
-                MouseMove?.Invoke(mouseX, mouseY);
-                if (context.GetMouse(Mouse.Any).Down) {
-                    for (int i = 0; i < 3; i++) {
-                        Mouse current = (Mouse)i;
-                        if (context.GetMouse(current).Down) MouseDrag?.Invoke(mouseX, mouseY, current);
+            if (PointWithin(mouseX, mouseY, TopLeft, BottomRight)) {
+                if ((mouseX != mouseLastX || mouseY != mouseLastY)) {
+                    MouseMove?.Invoke(mouseX, mouseY);
+                    if (context.GetMouse(Mouse.Any).Down) {
+                        for (int i = 0; i < 3; i++) {
+                            Mouse current = (Mouse)i;
+                            if (context.GetMouse(current).Down) MouseDrag?.Invoke(localX, localY, current);
+                        }
                     }
                 }
-            }
-            mouseLastX = mouseX;
-            mouseLastY = mouseY;
+                mouseLastX = mouseX;
+                mouseLastY = mouseY;
 
-            for (int i = 0; i < 3; i++) {
-                Mouse current = (Mouse)i;
-                if (context.GetMouse(current).Down) MouseDown?.Invoke(mouseX, mouseY, current);
-                if (context.GetMouse(current).Up) MouseUp?.Invoke(mouseX, mouseY, current);
-                if (context.GetMouse(current).Pressed) MousePress?.Invoke(mouseX, mouseY, current);
+                for (int i = 0; i < 3; i++) {
+                    Mouse current = (Mouse)i;
+                    if (context.GetMouse(current).Down) MouseDown?.Invoke(localX, localY, current);
+                    if (context.GetMouse(current).Up) MouseUp?.Invoke(localX, localY, current);
+                    if (context.GetMouse(current).Pressed) MousePress?.Invoke(localX, localY, current);
+                }
             }
             #endregion Fire Mouse Events
+            #region Fire Position Events
+            if (oldX != X || oldY != Y)
+                PositionChange?.Invoke(X, Y);
+            if (oldWidth != Width || oldHeight != Height)
+                DimensionsChange?.Invoke(Width, Height);
+
+            oldX = X;
+            oldY = Y;
+            oldWidth = Width;
+            oldHeight = Height;
+
+            #endregion Fire Position Events
         }
         public virtual void Draw(Game context, bool drawDebug = false) {
             if (drawDebug) {
