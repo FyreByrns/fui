@@ -19,11 +19,13 @@ namespace pecsui {
 
     class Testing : Game {
         List<UIElement> ui = new List<UIElement>() {
-            new UIElement(){X=10,Y=10,Width=100,Height=50},
+            new UIElement(){X=10,Y=10,Width=100,Height=50,MarginX=20,MarginY=20},
+            new ResizeableContainer(100, 100, 100, 100),
         };
 
         public Testing() {
             ui[0].MousePress += Testing_MouseClick;
+            ui[0].Parent = ui[1];
 
             Construct(800, 600, 1, 1); Start();
         }
@@ -34,6 +36,7 @@ namespace pecsui {
 
         public override void OnUpdate(float elapsed) {
             base.OnUpdate(elapsed);
+            Clear(Pixel.Empty);
 
             foreach (UIElement e in ui) {
                 e.Update(this);
@@ -188,7 +191,7 @@ namespace pecsui {
                     if (context.GetMouse(Mouse.Any).Down) {
                         for (int i = 0; i < 3; i++) {
                             Mouse current = (Mouse)i;
-                            if (context.GetMouse(current).Down) MouseDrag?.Invoke(localX, localY, current);
+                            if (context.GetMouse(current).Down) MouseDrag?.Invoke(mouseX, mouseY, current);
                         }
                     }
                 }
@@ -197,9 +200,9 @@ namespace pecsui {
 
                 for (int i = 0; i < 3; i++) {
                     Mouse current = (Mouse)i;
-                    if (context.GetMouse(current).Down) MouseDown?.Invoke(localX, localY, current);
-                    if (context.GetMouse(current).Up) MouseUp?.Invoke(localX, localY, current);
-                    if (context.GetMouse(current).Pressed) MousePress?.Invoke(localX, localY, current);
+                    if (context.GetMouse(current).Down) MouseDown?.Invoke(mouseX, mouseY, current);
+                    if (context.GetMouse(current).Up) MouseUp?.Invoke(mouseX, mouseY, current);
+                    if (context.GetMouse(current).Pressed) MousePress?.Invoke(mouseX, mouseY, current);
                 }
             }
             #endregion Fire Mouse Events
@@ -221,59 +224,81 @@ namespace pecsui {
             _parentOld = _parent;
 
             #endregion Fire Familial Events
+
+            foreach (UIElement child in Children) child.Update(context);
         }
         public virtual void Draw(Game context, bool drawDebug = false) {
             if (drawDebug) {
                 // Bounds
                 context.DrawRect(TopLeft, BottomRight, Pixel.Presets.Red);
             }
+            foreach (UIElement child in Children) child.Draw(context, drawDebug);
         }
     }
 
     public class ResizeableElement : UIElement {
-        UIElement TopLeftHandle, TopRightHandle, BottomLeftHandle, BottomRightHandle;
+        protected UIElement TopLeftHandle, BottomRightHandle;
+        int handleWidth = 40;
+        int halfHandleWidth => handleWidth / 2;
 
-        public ResizeableElement() {
-            TopLeftHandle = new UIElement() { Width = 10, Height = 10 };
-            TopRightHandle = new UIElement() { Width = 10, Height = 10 };
-            BottomLeftHandle = new UIElement() { Width = 10, Height = 10 };
-            BottomRightHandle = new UIElement() { Width = 10, Height = 10 };
+        public ResizeableElement(int x, int y, int wid, int hgt) {
+            X = x; Y = y; Width = wid; Height = hgt;
+
+            TopLeftHandle = new UIElement() { X = X - handleWidth, Y = Y - handleWidth, Width = handleWidth, Height = handleWidth };
+            BottomRightHandle = new UIElement() { X = Right + handleWidth, Y = Bottom + handleWidth, Width = handleWidth, Height = handleWidth };
 
             TopLeftHandle.MouseDrag += TopLeftHandle_MouseDrag;
-            TopRightHandle.MouseDrag += TopRightHandle_MouseDrag;
-            BottomLeftHandle.MouseDrag += BottomLeftHandle_MouseDrag;
             BottomRightHandle.MouseDrag += BottomRightHandle_MouseDrag;
+
+            Children.Add(TopLeftHandle);
+            Children.Add(BottomRightHandle);
 
             PositionChange += OnChangePosition;
             DimensionsChange += OnChangePosition;
         }
 
+        public override void Update(Game context) {
+            base.Update(context);
+
+            X = TopLeftHandle.X + handleWidth;
+            Y = TopLeftHandle.Y + handleWidth;
+
+            Width = BottomRightHandle.X - X;
+            Height = BottomRightHandle.Y - Y;
+        }
+
         private void TopLeftHandle_MouseDrag(int x, int y, Mouse button) {
-            TopLeftHandle.X = x - 5;
-            TopLeftHandle.Y = y - 5;
-        }
-        private void TopRightHandle_MouseDrag(int x, int y, Mouse button) {
-            TopRightHandle.X = x - 5;
-            TopRightHandle.Y = y - 5;
-        }
-        private void BottomLeftHandle_MouseDrag(int x, int y, Mouse button) {
-            BottomLeftHandle.X = x - 5;
-            BottomLeftHandle.Y = y - 5;
+            TopLeftHandle.X = x - halfHandleWidth;
+            TopLeftHandle.Y = y - halfHandleWidth;
         }
         private void BottomRightHandle_MouseDrag(int x, int y, Mouse button) {
-            BottomRightHandle.X = x - 5;
-            BottomRightHandle.Y = y - 5;
+            BottomRightHandle.X = x - halfHandleWidth;
+            BottomRightHandle.Y = y - halfHandleWidth;
         }
 
         private void OnChangePosition(int newX, int newY) {
-            TopLeftHandle.X = Left - 5;
-            TopLeftHandle.Y = Top - 5;
-            TopRightHandle.X = Right - 5;
-            TopRightHandle.Y = Top - 5;
-            BottomLeftHandle.X = Left - 5;
-            BottomLeftHandle.Y = Bottom - 5;
-            BottomRightHandle.X = Right - 5;
-            BottomRightHandle.Y = Bottom - 5;
+            //TopLeftHandle.X = Left - 5;
+            //TopLeftHandle.Y = Top - 5;
+            //BottomRightHandle.X = Right - 5;
+            //BottomRightHandle.Y = Bottom - 5;
+        }
+    }
+    public class ResizeableContainer : ResizeableElement {
+        public ResizeableContainer(int x, int y, int wid, int hgt) : base(x, y, wid, hgt) {
+
+        }
+
+        public override void Update(Game context) {
+            base.Update(context);
+
+            foreach(UIElement c in Children) {
+                if (c == TopLeftHandle || c == BottomRightHandle) continue;
+
+                c.X = Left + c.MarginX;
+                c.Y = Top + c.MarginY;
+                c.Width = Width - 2*c.MarginX;
+                c.Height = Height - 2*c.MarginY;
+            }
         }
     }
 }
