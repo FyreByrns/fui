@@ -105,6 +105,8 @@ namespace pecsui {
         public event DimensionsChangeEventHandler DimensionsChange;
 
         #endregion Position Events
+        public delegate void ParentChangeEventHandler(UIElement newParent);
+        public event ParentChangeEventHandler ParentChange;
 
         #endregion Events
         #region Mouse Tracking
@@ -156,7 +158,6 @@ namespace pecsui {
                 _parentOld?.Children?.Remove(this);
                 _parent = value;
                 _parent?.Children?.Add(this);
-                _parentOld = _parent;
             }
         }
         public List<UIElement> Children { get; set; } = new List<UIElement>();
@@ -214,12 +215,65 @@ namespace pecsui {
             oldHeight = Height;
 
             #endregion Fire Position Events
+            #region Fire Familial Events
+            if (Parent != _parentOld)
+                ParentChange?.Invoke(Parent);
+            _parentOld = _parent;
+
+            #endregion Fire Familial Events
         }
         public virtual void Draw(Game context, bool drawDebug = false) {
             if (drawDebug) {
                 // Bounds
                 context.DrawRect(TopLeft, BottomRight, Pixel.Presets.Red);
             }
+        }
+    }
+
+    public class ResizeableElement : UIElement {
+        UIElement TopLeftHandle, TopRightHandle, BottomLeftHandle, BottomRightHandle;
+
+        public ResizeableElement() {
+            TopLeftHandle = new UIElement() { Width = 10, Height = 10 };
+            TopRightHandle = new UIElement() { Width = 10, Height = 10 };
+            BottomLeftHandle = new UIElement() { Width = 10, Height = 10 };
+            BottomRightHandle = new UIElement() { Width = 10, Height = 10 };
+
+            TopLeftHandle.MouseDrag += TopLeftHandle_MouseDrag;
+            TopRightHandle.MouseDrag += TopRightHandle_MouseDrag;
+            BottomLeftHandle.MouseDrag += BottomLeftHandle_MouseDrag;
+            BottomRightHandle.MouseDrag += BottomRightHandle_MouseDrag;
+
+            PositionChange += OnChangePosition;
+            DimensionsChange += OnChangePosition;
+        }
+
+        private void TopLeftHandle_MouseDrag(int x, int y, Mouse button) {
+            TopLeftHandle.X = x - 5;
+            TopLeftHandle.Y = y - 5;
+        }
+        private void TopRightHandle_MouseDrag(int x, int y, Mouse button) {
+            TopRightHandle.X = x - 5;
+            TopRightHandle.Y = y - 5;
+        }
+        private void BottomLeftHandle_MouseDrag(int x, int y, Mouse button) {
+            BottomLeftHandle.X = x - 5;
+            BottomLeftHandle.Y = y - 5;
+        }
+        private void BottomRightHandle_MouseDrag(int x, int y, Mouse button) {
+            BottomRightHandle.X = x - 5;
+            BottomRightHandle.Y = y - 5;
+        }
+
+        private void OnChangePosition(int newX, int newY) {
+            TopLeftHandle.X = Left - 5;
+            TopLeftHandle.Y = Top - 5;
+            TopRightHandle.X = Right - 5;
+            TopRightHandle.Y = Top - 5;
+            BottomLeftHandle.X = Left - 5;
+            BottomLeftHandle.Y = Bottom - 5;
+            BottomRightHandle.X = Right - 5;
+            BottomRightHandle.Y = Bottom - 5;
         }
     }
 }
